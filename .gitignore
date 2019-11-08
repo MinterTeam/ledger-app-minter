@@ -1,0 +1,11 @@
+obj
+dep
+*.o
+*.dep
+*.la
+bin
+.idea
+!.idea/codeStyles
+cmake-build-*
+debug
+debug_keys.txt

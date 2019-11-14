@@ -1,0 +1,11 @@
+[generators]
+cmake
+
+[requires]
+minter_tx/0.3.0@minter/latest
+fmt/5.3.0@bincrafters/stable
+boost_program_options/1.69.0@bincrafters/stable
+toolboxpp/2.3.1@scatter/latest
+
+[build_requires]
+gtest/1.8.1@bincrafters/stable

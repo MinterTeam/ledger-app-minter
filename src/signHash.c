@@ -21,7 +21,6 @@
 #include <stdbool.h>
 #include <os.h>
 #include <os_io_seproxyhal.h>
-#include "blake2b.h"
 #include "minter.h"
 #include "ux.h"
 
@@ -100,11 +99,11 @@ static unsigned int ui_signHash_approve_button(unsigned int button_mask, unsigne
 		// Derive the secret key and sign the hash, storing the signature in
 		// the APDU buffer. This is the first Sia-specific function we've
 		// encountered; it is defined in sia.c.
-		deriveAndSign(G_io_apdu_buffer, ctx->keyIndex, ctx->hash);
+		deriveAndSign(G_io_apdu_buffer, ctx->derivation_index, ctx->hash);
 		// Send the data in the APDU buffer, along with a special code that
-		// indicates approval. 64 is the number of bytes in the response APDU,
+		// indicates approval. 65 is the number of bytes in the response APDU,
 		// sans response code.
-		io_exchange_with_code(SW_OK, 64);
+		io_exchange_with_code(SW_OK, 65);
 		// Return to the main screen.
 		ui_idle();
 		break;
@@ -212,7 +211,7 @@ static unsigned int ui_signHash_compare_button(unsigned int button_mask, unsigne
 		// into the indexStr buffer. We copy two bytes in the final os_memmove
 		// so as to include the terminating '\0' byte for the string.
 		os_memmove(ctx->indexStr, "with Key #", 10);
-		int n = bin2dec(ctx->indexStr+10, ctx->keyIndex);
+		int n = bin2dec(ctx->indexStr+10, ctx->derivation_index);
 		os_memmove(ctx->indexStr+10+n, "?", 2);
 		// Note that because the approval screen does not have a preprocessor,
 		// we must pass NULL.
@@ -231,7 +230,7 @@ static unsigned int ui_signHash_compare_button(unsigned int button_mask, unsigne
 void handleSignHash(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLength, volatile unsigned int *flags, volatile unsigned int *tx) {
 	// Read the index of the signing key. U4LE is a helper macro for
 	// converting a 4-byte buffer to a uint32_t.
-	ctx->keyIndex = U4LE(dataBuffer, 0);
+	ctx->derivation_index = U4LE(dataBuffer, 0);
 	// Read the hash.
 	os_memmove(ctx->hash, dataBuffer+4, sizeof(ctx->hash));
 
@@ -248,7 +247,7 @@ void handleSignHash(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLe
 	// magic? To which I can only reply: ¯\_(ツ)_/¯
 	UX_DISPLAY(ui_signHash_compare, ui_prepro_signHash_compare);
 
-	// Set the IO_ASYNC_REPLY flag. This flag tells sia_main that we aren't
+	// Set the IO_ASYNC_REPLY flag. This flag tells minter_main that we aren't
 	// sending data to the computer immediately; we need to wait for a button
 	// press first.
 	*flags |= IO_ASYNCH_REPLY;
@@ -257,11 +256,11 @@ void handleSignHash(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLe
 // Now that we've seen the individual pieces, we can construct a full picture
 // of what the signHash command looks like.
 //
-// The command begins when sia_main reads an APDU packet from the computer
-// with INS == INS_SIGN_HASH. sia_main looks up the appropriate handler,
+// The command begins when minter_main reads an APDU packet from the computer
+// with INS == INS_SIGN_HASH. minter_main looks up the appropriate handler,
 // handleSignHash, and calls it. handleSignHash reads the command data,
 // prepares and displays the comparison screen, and sets the IO_ASYNC_REPLY
-// flag. Control returns to sia_main, which blocks when it reaches the
+// flag. Control returns to minter_main, which blocks when it reaches the
 // io_exchange call.
 //
 // UX_DISPLAY was called with the ui_prepro_signHash_compare preprocessor, so
@@ -285,7 +284,7 @@ void handleSignHash(uint8_t p1, uint8_t p2, uint8_t *dataBuffer, uint16_t dataLe
 // the IO_RETURN_AFTER_TX flag set. The button handler then calls ui_idle,
 // thus returning to the main menu.
 //
-// This completes the signHash command. Back in sia_main, io_exchange is still
+// This completes the signHash command. Back in minter_main, io_exchange is still
 // blocked, waiting for the computer to send a new request APDU. For the next
 // section of this walkthrough, we will assume that the next APDU requests the
 // getPublicKey command, so proceed to getPublicKey.c.

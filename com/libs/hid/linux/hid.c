@@ -625,8 +625,11 @@ hid_device * HID_API_EXPORT hid_open_path(const char *path)
 
 	dev = new_hid_device();
 
-	/* OPEN HERE */
-	dev->device_handle = open(path, O_RDWR);
+    /* OPEN HERE */
+    int ret = dev->device_handle = open(path, O_RDWR);
+    if(ret < 0) {
+        return NULL;
+    }
 
 	/* If we have a good handle, return it. */
 	if (dev->device_handle > 0) {

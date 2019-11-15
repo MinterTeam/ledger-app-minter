@@ -1,7 +1,17 @@
+cmake_minimum_required(VERSION 3.10)
 project(ledger-app-minter
+        VERSION 0.1.0
+        DESCRIPTION "Minter Ledger CMake wip project"
+        HOMEPAGE_URL "https://github.com/MinterTeam/ledger-app-minter"
         LANGUAGES C CXX)
-cmake_minimum_required(VERSION 3.13)
+
 set(CMAKE_CXX_STANDARD 17)
+
+if (WIN32)
+	execute_process(COMMAND cmd /C "echo ${CMAKE_PROJECT_VERSION} > ${CMAKE_CURRENT_SOURCE_DIR}/version")
+else ()
+	execute_process(COMMAND bash -c "echo ${CMAKE_PROJECT_VERSION} > ${CMAKE_CURRENT_SOURCE_DIR}/version")
+endif ()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/sdk/include)
 set($ENV{BOLOS_SDK} ${CMAKE_CURRENT_SOURCE_DIR}/libs/sdk)

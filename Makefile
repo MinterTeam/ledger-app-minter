@@ -49,7 +49,7 @@ APPVERSION = 0.1.0
 #0x33000004 on Nano X with firmware 1.x
 
 # The --path argument here restricts which BIP32 paths the app is allowed to derive.
-APP_LOAD_PARAMS = --appFlags 0x40 --path "44'/60'" --curve secp256k1 --curve ed25519 $(COMMON_LOAD_PARAMS)
+APP_LOAD_PARAMS = --appFlags 0x40 --path "44'/60'" --curve secp256k1 $(COMMON_LOAD_PARAMS)
 APP_SOURCE_PATH = src
 SDK_SOURCE_PATH = lib_stusb lib_stusb_impl
 

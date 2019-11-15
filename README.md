@@ -2,6 +2,9 @@
 
 This is the official Minter wallet app for the Ledger Nano S.
 
+# DISCLAIMER
+This wallet is "work in progress" and development is unfinished yet. So use it on your own risk.
+
 # Dev Debian Requirements Guide
 - apt install gcc-multilib clang libusb-dev libudev-dev usbutils python python-pip
 - pip install image

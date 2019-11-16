@@ -29,9 +29,7 @@ add_custom_target(ledger-build
                   )
 
 add_executable(ledger-minter-dummy ${SOURCES})
-target_link_libraries(ledger-minter-dummy m gcc c)
-
-add_subdirectory(com)
+#target_link_libraries(ledger-minter-dummy m gcc c)
 
 
 

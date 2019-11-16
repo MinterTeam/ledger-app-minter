@@ -9,33 +9,32 @@
 #include <os_io_seproxyhal.h>
 
 typedef struct {
-	uint32_t keyIndex;
-	bool genAddr;
+	uint32_t deriveIndex;
 	uint8_t displayIndex;
 
 	// NUL-terminated strings for display
-	uint8_t typeStr[40]; // variable-length
-	uint8_t keyStr[40]; // variable-length
-	uint8_t fullStr[77]; // variable length
+	uint8_t headerStr[40]; // variable-length
+	uint8_t deriveIndexStr[40]; // variable-length
+	uint8_t addressStrFull[43]; // variable length
 	// partialStr contains 12 characters of a longer string. This allows text
 	// to be scrolled.
-	uint8_t partialStr[13];
-} getPublicKeyContext_t;
+	uint8_t addressStrPart[13];
+} getAddressContext_t;
 
 typedef struct {
-	uint32_t derivation_index;
+	uint32_t deriveIndex;
 	uint8_t hash[32];
-	uint8_t hexHash[64];
+	uint8_t hashStrFull[64];
 	uint8_t displayIndex;
 	// NUL-terminated strings for display
-	uint8_t indexStr[40]; // variable-length
-	uint8_t partialHashStr[13];
+	uint8_t deriveIndexStr[40]; // variable-length
+	uint8_t hashStrPart[13];
 } signHashContext_t;
 
 // To save memory, we store all the context types in a single global union,
 // taking advantage of the fact that only one command is executed at a time.
 typedef union {
-	getPublicKeyContext_t getPublicKeyContext;
+	getAddressContext_t getAddressContext;
 	signHashContext_t signHashContext;
 } commandContext;
 extern commandContext global;
@@ -59,6 +58,26 @@ extern ux_state_t ux;
 #define UI_ICON_LEFT(userid, glyph) {{BAGL_ICON,userid,3,12,7,7,0,0,0,0xFFFFFF,0,0,glyph},NULL,0,0,0,NULL,NULL,NULL}
 #define UI_ICON_RIGHT(userid, glyph) {{BAGL_ICON,userid,117,13,8,6,0,0,0,0xFFFFFF,0,0,glyph},NULL,0,0,0,NULL,NULL,NULL}
 #define UI_TEXT(userid, x, y, w, text) {{BAGL_LABELINE,userid,x,y,w,12,0,0,0,0xFFFFFF,0,BAGL_FONT_OPEN_SANS_REGULAR_11px|BAGL_FONT_ALIGNMENT_CENTER,0},(char *)text,0,0,0,NULL,NULL,NULL}
+
+static void slideText(bool forward, uint8_t *index, uint8_t *fullStr, size_t fullStrSz, uint8_t *partStr) {
+    if(!forward) {
+        if ((*index) > 0) {
+            (*index)--;
+        } else {
+            // no need to redraw UI
+            return;
+        }
+    } else {
+        if ((*index) < (fullStrSz - 12)) {
+            (*index)++;
+        } else {
+            return;
+        }
+    }
+
+    os_memmove(partStr, fullStr + (*index), 12);
+    UX_REDISPLAY();
+}
 
 // ui_idle displays the main menu screen. Command handlers should call ui_idle
 // when they finish.

@@ -179,9 +179,9 @@ void io_exchange_with_code(uint16_t code, uint16_t tx) {
 // The APDU protocol uses a single-byte instruction code (INS) to specify
 // which command should be executed. We'll use this code to dispatch on a
 // table of function pointers.
-#define INS_GET_VERSION     (0x01u)
-#define INS_GET_PUBLIC_KEY  (0x01u << 1u)
-#define INS_SIGN_HASH       (0x01u << 2u)
+#define INS_GET_VERSION  (0x01u)
+#define INS_GET_ADDRESS  (0x01u << 1u)
+#define INS_SIGN_HASH    (0x01u << 2u)
 
 // This is the function signature for a command handler. 'flags' and 'tx' are
 // out-parameters that will control the behavior of the next io_exchange call
@@ -195,13 +195,13 @@ typedef void handler_fn_t(uint8_t p1,
                           volatile unsigned int *tx);
 
 handler_fn_t handleGetVersion;
-handler_fn_t handleGetPublicKey;
+handler_fn_t handleGetAddress;
 handler_fn_t handleSignHash;
 
 static handler_fn_t *lookupHandler(uint8_t ins) {
     switch (ins) {
         case INS_GET_VERSION: return handleGetVersion;
-        case INS_GET_PUBLIC_KEY: return handleGetPublicKey;
+        case INS_GET_ADDRESS: return handleGetAddress;
         case INS_SIGN_HASH: return handleSignHash;
         default: return NULL;
     }

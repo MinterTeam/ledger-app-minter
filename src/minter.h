@@ -19,7 +19,7 @@
 #define MINTER_CURVE CX_CURVE_SECP256K1
 #define CX_SHA3K_SIZE 32
 
-#ifndef PRINTF
+#if !defined(PRINTF) || !defined(HAVE_PRINTF)
 #define PRINTF(...) (void)(__VA_ARGS__)
 #endif
 

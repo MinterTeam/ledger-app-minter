@@ -26,25 +26,25 @@
 #include "ux.h"
 
 // Get a pointer to getPublicKey's state variables.
-static getPublicKeyContext_t *ctx = &global.getPublicKeyContext;
+static getAddressContext_t *ctx = &global.getAddressContext;
 
 // Define the comparison screen. This is where the user will compare the
 // public key (or address) on their device to the one shown on the computer.
-static const bagl_element_t ui_getPublicKey_compare[] = {
+static const bagl_element_t ui_getAddress_compare[] = {
     UI_BACKGROUND(),
     UI_ICON_LEFT(0x01, BAGL_GLYPH_ICON_LEFT),
     UI_ICON_RIGHT(0x02, BAGL_GLYPH_ICON_RIGHT),
-    UI_TEXT(0x00, 0, 12, 128, "Compare:"),
+    UI_TEXT(0x00, 0, 12, 128, global.getAddressContext.headerStr),
     // The visible portion of the public key or address.
-    UI_TEXT(0x00, 0, 26, 128, global.getPublicKeyContext.partialStr),
+    UI_TEXT(0x00, 0, 26, 128, global.getAddressContext.addressStrPart),
 };
 
 // Define the preprocessor for the comparison screen. As in signHash, this
 // preprocessor selectively hides the left/right arrows. The only difference
 // is that, since public keys and addresses have different lengths, checking
 // for the end of the string is slightly more complicated.
-static const bagl_element_t *ui_prepro_getPublicKey_compare(const bagl_element_t *element) {
-    int fullSize = ctx->genAddr ? 76 : 64;
+static const bagl_element_t *ui_prepro_getAddress_compare(const bagl_element_t *element) {
+    int fullSize = 42;
     if ((element->component.userid == 1 && ctx->displayIndex == 0) ||
         (element->component.userid == 2 && ctx->displayIndex == fullSize - 12)) {
         return NULL;
@@ -54,27 +54,16 @@ static const bagl_element_t *ui_prepro_getPublicKey_compare(const bagl_element_t
 
 // Define the button handler for the comparison screen. Again, this is nearly
 // identical to the signHash comparison button handler.
-static unsigned int ui_getPublicKey_compare_button(unsigned int button_mask, unsigned int button_mask_counter) {
-    int fullSize = ctx->genAddr ? 76 : 64;
+static unsigned int ui_getAddress_compare_button(unsigned int button_mask, unsigned int button_mask_counter) {
     switch (button_mask) {
         case BUTTON_LEFT:
         case BUTTON_EVT_FAST | BUTTON_LEFT: // SEEK LEFT
-            if (ctx->displayIndex > 0) {
-                ctx->displayIndex--;
-            }
-            os_memmove(ctx->partialStr, ctx->fullStr + ctx->displayIndex, 12);
-            UX_REDISPLAY();
+            slideText(false, &ctx->displayIndex, ctx->addressStrFull, 42, ctx->addressStrPart);
             break;
-
         case BUTTON_RIGHT:
         case BUTTON_EVT_FAST | BUTTON_RIGHT: // SEEK RIGHT
-            if (ctx->displayIndex < fullSize - 12) {
-                ctx->displayIndex++;
-            }
-            os_memmove(ctx->partialStr, ctx->fullStr + ctx->displayIndex, DISPLAY_X);
-            UX_REDISPLAY();
+            slideText(true, &ctx->displayIndex, ctx->addressStrFull, 42, ctx->addressStrPart);
             break;
-
         case BUTTON_EVT_RELEASED | BUTTON_LEFT | BUTTON_RIGHT: // PROCEED
             // The user has finished comparing, so return to the main screen.
             ui_idle();
@@ -85,36 +74,29 @@ static unsigned int ui_getPublicKey_compare_button(unsigned int button_mask, uns
 
 // Define the approval screen. This is where the user will approve the
 // generation of the public key (or address).
-static const bagl_element_t ui_getPublicKey_approve[] = {
+static const bagl_element_t ui_getAddress_approve[] = {
     UI_BACKGROUND(),
     UI_ICON_LEFT(0x00, BAGL_GLYPH_ICON_CROSS),
     UI_ICON_RIGHT(0x00, BAGL_GLYPH_ICON_CHECK),
-    // These two lines form a complete sentence:
-    //
-    //    Generate Public
-    //       Key #123?
-    //
-    // or:
     //
     //    Generate Address
     //     from Key #123?
     //
     // Since both lines differ based on user-supplied parameters, we can't use
     // compile-time string literals for either of them.
-    UI_TEXT(0x00, 0, 12, 128, global.getPublicKeyContext.typeStr),
-    UI_TEXT(0x00, 0, 26, 128, global.getPublicKeyContext.keyStr),
+    UI_TEXT(0x00, 0, 12, 128, global.getAddressContext.headerStr),
+    UI_TEXT(0x00, 0, 26, 128, global.getAddressContext.deriveIndexStr),
 };
 
 // This is the button handler for the approval screen. If the user approves,
 // it generates and sends the public key and address. (For simplicity, we
 // always send both, regardless of which one the user requested.)
-static unsigned int ui_getPublicKey_approve_button(unsigned int button_mask, unsigned int button_mask_counter) {
+static unsigned int ui_getAddress_approve_button(unsigned int button_mask, unsigned int button_mask_counter) {
     // The response APDU will contain multiple objects, which means we need to
     // remember our offset within G_io_apdu_buffer. By convention, the offset
     // variable is named 'tx'.
     uint16_t tx = 0;
     cx_ecfp_public_key_t publicKey;
-    cx_ecfp_private_key_t privateKey;
     switch (button_mask) {
         case BUTTON_EVT_RELEASED | BUTTON_LEFT: // REJECT
             io_exchange_with_code(SW_USER_REJECTED, 0);
@@ -122,54 +104,51 @@ static unsigned int ui_getPublicKey_approve_button(unsigned int button_mask, uns
             break;
 
         case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // APPROVE
+            // LOGIN BEGIN
+
             // Derive the public key and address and store them in the APDU
             // buffer. Even though we know that tx starts at 0, it's best to
             // always add it explicitly; this prevents a bug if we reorder the
             // statements later.
-            deriveMinterKeypair(ctx->keyIndex, &privateKey, &publicKey);
+            deriveMinterKeypair(ctx->deriveIndex, NULL, &publicKey);
 
-            // write 65 bytes pub key
-            os_memmove(G_io_apdu_buffer + tx, publicKey.W, 65);
-            tx += 65;
 
             // write 20 bytes address
             pubkeyToMinterAddress(G_io_apdu_buffer + tx, publicKey.W);
             tx += 20;
+
+            // cleanup public key
+            os_memset(&publicKey, 0, sizeof(publicKey));
             // Flush the APDU buffer, sending the response.
             io_exchange_with_code(SW_OK, tx);
 
-//            if(true) {
-//                ui_idle();
-//                break;
-//            }
+            // UI BEGIN
 
             // Prepare the comparison screen, filling in the header and body text.
-            if (ctx->genAddr) {
-                os_memmove(ctx->typeStr, "Compare:", 8);
-                // The APDU buffer already contains the hex-encoded address, so
-                // copy it directly.
+            os_memmove(ctx->headerStr, "Compare Address:", 16);
+            ctx->headerStr[16] = '\0';
+            // The APDU buffer already contains the hex-encoded address, so
+            // copy it directly.
 
-                // write minter address prefix
-                os_memmove(ctx->fullStr, "Mx", 2);
-                uint8_t addrStr[40];
-                // convert bytes to hex string
-                bin2hex(addrStr, G_io_apdu_buffer + 65, 40);
-                // insert address to context
-                os_memmove(ctx->fullStr+2, addrStr, 40);
+            // write minter address prefix
+            os_memmove(ctx->addressStrFull, "Mx", 2);
+            uint8_t addrStr[40];
+            // convert bytes to hex string
+            bin2hex(addrStr, G_io_apdu_buffer, 40);
+            // insert address to context
+            os_memmove(ctx->addressStrFull + 2, addrStr, 40);
 
-                ctx->fullStr[2+40] = '\0';
-            } else {
-                os_memmove(ctx->typeStr, "Compare:", 8);
-                // The APDU buffer contains the raw bytes of the public key, so
-                // first we need to convert to a human-readable form.
-                bin2hex(ctx->fullStr, G_io_apdu_buffer, 65);
-            }
-            os_memmove(ctx->partialStr, ctx->fullStr, 12);
-            ctx->partialStr[12] = '\0';
+            // finalize with terminator
+            ctx->addressStrFull[42] = '\0';
+
+            // write to partial buf 12 bytes of full address
+            os_memmove(ctx->addressStrPart, ctx->addressStrFull, 12);
+            ctx->addressStrPart[12] = '\0';
+            // notify, this is first part of address
             ctx->displayIndex = 0;
 
             // Display the comparison screen.
-            UX_DISPLAY(ui_getPublicKey_compare, ui_prepro_getPublicKey_compare);
+            UX_DISPLAY(ui_getAddress_compare, ui_prepro_getAddress_compare);
             break;
     }
     return 0;
@@ -180,45 +159,29 @@ static unsigned int ui_getPublicKey_approve_button(unsigned int button_mask, uns
 #define P2_DISPLAY_ADDRESS 0x00
 #define P2_DISPLAY_PUBKEY  0x01
 
-// handleGetPublicKey is the entry point for the getPublicKey command. It
+// handleGetAddress is the entry point for the getPublicKey command. It
 // reads the command parameters, prepares and displays the approval screen,
 // and sets the IO_ASYNC_REPLY flag.
-void handleGetPublicKey(uint8_t p1,
-                        uint8_t p2,
-                        uint8_t *dataBuffer,
-                        uint16_t dataLength,
-                        volatile unsigned int *flags,
-                        volatile unsigned int *tx) {
+void handleGetAddress(uint8_t p1,
+                      uint8_t p2,
+                      uint8_t *dataBuffer,
+                      uint16_t dataLength,
+                      volatile unsigned int *flags,
+                      volatile unsigned int *tx) {
     // Sanity-check the command parameters.
-    if ((p2 != P2_DISPLAY_ADDRESS) && (p2 != P2_DISPLAY_PUBKEY)) {
-        // Although THROW is technically a general-purpose exception
-        // mechanism, within a command handler it is basically just a
-        // convenient way of bailing out early and sending an error code to
-        // the computer. The exception will be caught by minter_main, which
-        // appends the code to the response APDU and sends it, much like
-        // io_exchange_with_code. THROW should not be called from
-        // preprocessors or button handlers.
-        THROW(SW_INVALID_PARAM);
-    }
 
-    // Read the key index from dataBuffer and set the genAddr flag according
-    // to p2.
-    ctx->keyIndex = U4LE(dataBuffer, 0);
-    ctx->genAddr = (p2 == P2_DISPLAY_ADDRESS);
+    // Read the key index from dataBuffer
+    ctx->deriveIndex = U4LE(dataBuffer, 0);
 
     // Prepare the approval screen, filling in the header and body text.
-    if (ctx->genAddr) {
-        os_memmove(ctx->typeStr, "Generate Address", 17);
-        os_memmove(ctx->keyStr, "from Key #", 10);
-        int n = bin2dec(ctx->keyStr + 10, ctx->keyIndex);
-        os_memmove(ctx->keyStr + 10 + n, "?", 2);
-    } else {
-        os_memmove(ctx->typeStr, "Generate Public", 16);
-        os_memmove(ctx->keyStr, "Key #", 5);
-        int n = bin2dec(ctx->keyStr + 5, ctx->keyIndex);
-        os_memmove(ctx->keyStr + 5 + n, "?", 2);
-    }
-    UX_DISPLAY(ui_getPublicKey_approve, NULL);
+    os_memmove(ctx->headerStr, "Generate Address", 16);
+    ctx->headerStr[16] = '\0';
+
+    os_memmove(ctx->deriveIndexStr, "from Key #", 10);
+    int n = bin2dec(ctx->deriveIndexStr + 10, ctx->deriveIndex);
+    os_memmove(ctx->deriveIndexStr + 10 + n, "?", 2);
+
+    UX_DISPLAY(ui_getAddress_approve, NULL);
 
     *flags |= IO_ASYNCH_REPLY;
 }

@@ -35,10 +35,10 @@ int bin2dec(uint8_t *dst, uint64_t n) {
 void deriveMinterKeypair(uint32_t index, cx_ecfp_private_key_t *privateKey, cx_ecfp_public_key_t *publicKey) {
     uint8_t root_privkey[32];
     cx_ecfp_private_key_t m_privKey;
-    m_privKey.curve = CX_CURVE_SECP256K1;
+    m_privKey.curve = MINTER_CURVE;
 
     cx_ecfp_public_key_t m_pubKey;
-    m_pubKey.curve = CX_CURVE_SECP256K1;
+    m_pubKey.curve = MINTER_CURVE;
 
     uint8_t master_seed[12] = "Bitcoin seed";
 

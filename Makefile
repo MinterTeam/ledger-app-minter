@@ -26,7 +26,7 @@ include $(BOLOS_SDK)/Makefile.defines
 TARGET_ID_NANOX=0x33000004
 TARGET_NAME_NANOX=TARGET_NANOX
 TARGET_ID_NANOS=0x31100004
-TARGET_ID_NANOS=TARGET_NANOS
+TARGET_NAME_NANOS=TARGET_NANOS
 
 #TARGET_ID=$(TARGET_ID_NANOX)
 #TARGET_NAME=$(TARGET_NAME_NANOX)
@@ -37,7 +37,7 @@ TARGET_ID_NANOS=TARGET_NANOS
 
 APPNAME    = Minter
 ICONNAME   = nanos_app_minter.gif
-APPVERSION = 0.1.0
+APPVERSION = $(shell cat version | tr -d "\n")
 
 #Target list
 #0x31100002 on Nano S with firmware <= 1.3.1
@@ -68,7 +68,7 @@ dev_ca_delete:
 	python3 -m ledgerblue.resetCustomCA --targetId $(TARGET_ID)
 
 load: all
-	python3 -m ledgerblue.loadApp --apdu $(APP_LOAD_PARAMS)
+	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 delete:
 	python3 -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)

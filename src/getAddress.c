@@ -88,6 +88,22 @@ static const bagl_element_t ui_getAddress_approve[] = {
     UI_TEXT(0x00, 0, 26, 128, global.getAddressContext.deriveIndexStr),
 };
 
+static void ioWriteAddress(uint16_t *tx) {
+    cx_ecfp_public_key_t publicKey;
+    // Derive the public key and address and store them in the APDU
+    // buffer. Even though we know that tx starts at 0, it's best to
+    // always add it explicitly; this prevents a bug if we reorder the
+    // statements later.
+    deriveMinterKeypair(ctx->deriveIndex, NULL, &publicKey);
+
+    // write 20 bytes address
+    pubkeyToMinterAddress(G_io_apdu_buffer + (*tx), publicKey.W);
+    *tx += 20;
+
+    // cleanup public key
+    os_memset(&publicKey, 0, sizeof(publicKey));
+}
+
 // This is the button handler for the approval screen. If the user approves,
 // it generates and sends the public key and address. (For simplicity, we
 // always send both, regardless of which one the user requested.)
@@ -104,7 +120,7 @@ static unsigned int ui_getAddress_approve_button(unsigned int button_mask, unsig
             break;
 
         case BUTTON_EVT_RELEASED | BUTTON_RIGHT: // APPROVE
-            // LOGIN BEGIN
+            //TODO: investigate wth is going on if use ioWriteAddress here
 
             // Derive the public key and address and store them in the APDU
             // buffer. Even though we know that tx starts at 0, it's best to
@@ -112,13 +128,13 @@ static unsigned int ui_getAddress_approve_button(unsigned int button_mask, unsig
             // statements later.
             deriveMinterKeypair(ctx->deriveIndex, NULL, &publicKey);
 
-
             // write 20 bytes address
             pubkeyToMinterAddress(G_io_apdu_buffer + tx, publicKey.W);
             tx += 20;
 
             // cleanup public key
             os_memset(&publicKey, 0, sizeof(publicKey));
+
             // Flush the APDU buffer, sending the response.
             io_exchange_with_code(SW_OK, tx);
 
@@ -156,8 +172,7 @@ static unsigned int ui_getAddress_approve_button(unsigned int button_mask, unsig
 
 // These are APDU parameters that control the behavior of the getPublicKey
 // command.
-#define P2_DISPLAY_ADDRESS 0x00
-#define P2_DISPLAY_PUBKEY  0x01
+#define P1_GET_ADDRESS_SILENT 0x01
 
 // handleGetAddress is the entry point for the getPublicKey command. It
 // reads the command parameters, prepares and displays the approval screen,
@@ -168,10 +183,18 @@ void handleGetAddress(uint8_t p1,
                       uint16_t dataLength,
                       volatile unsigned int *flags,
                       volatile unsigned int *tx) {
-    // Sanity-check the command parameters.
 
     // Read the key index from dataBuffer
     ctx->deriveIndex = U4LE(dataBuffer, 0);
+
+    if(p1 == P1_GET_ADDRESS_SILENT) {
+        uint16_t txl = 0;
+        // Write to G_io_apdu_frame generated address and increment tx
+        ioWriteAddress(&txl);
+        // Flush the APDU buffer, sending the response.
+        io_exchange_with_code(SW_OK, txl);
+        return;
+    }
 
     // Prepare the approval screen, filling in the header and body text.
     os_memmove(ctx->headerStr, "Generate Address", 16);
@@ -182,7 +205,6 @@ void handleGetAddress(uint8_t p1,
     os_memmove(ctx->deriveIndexStr + 10 + n, "?", 2);
 
     UX_DISPLAY(ui_getAddress_approve, NULL);
-
     *flags |= IO_ASYNCH_REPLY;
 }
 

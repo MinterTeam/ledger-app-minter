@@ -18,6 +18,7 @@ fi
 HAVE_LEDGERBLUE=$(${PYTHON_BIN} -c "import ledgerblue")
 if [ "${HAVE_LEDGERBLUE}" != "" ]
 then
+	${PIP_BIN} install image
 	${PIP_BIN} install ledgerblue
 fi
 

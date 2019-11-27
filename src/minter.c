@@ -74,7 +74,8 @@ void deriveAndSign(uint8_t *dst, uint32_t index, const uint8_t *hash) {
     const uint32_t signature_cap = 100;
     uint8_t signature[signature_cap];
 
-    uint32_t info = 0;
+    uint32_t info = CX_ECCINFO_PARITY_ODD;
+//    PRINTF("Sign info (before):\n %d \n\n", info);
     cx_ecdsa_sign(
         &privateKey,
         CX_RND_RFC6979 | CX_LAST,
@@ -84,19 +85,42 @@ void deriveAndSign(uint8_t *dst, uint32_t index, const uint8_t *hash) {
         signature,
         signature_cap,
         &info);
+//    PRINTF("Sign info (after):\n %d \n\n", info);
 
     os_memset(&privateKey, 0, sizeof(privateKey));
 
-    uint8_t rec[1] = {(uint8_t) 27};
+    uint8_t rec[1] = {(uint8_t) info + (uint8_t) 27};
+
+//    PRINTF("raw tlv signature:\n %.*H \n\n", signature_cap, signature);
 
     // signature TLV encoded
     // structure of it: 30 L 02 Lr r 02 Ls s
-    // as our method is 100% determinated, just getting data from fixed positions
-    os_memmove(dst + 0, signature + 4 + 0 + 0, 32);
-    os_memmove(dst + 32, signature + 4 + 32 + 2, 32);
-    os_memmove(dst + 64, rec, 1);
+    // signature data can be overflowed, so firstly create temporary expanded buffers
+    uint8_t rs[33], ss[33], r[32], s[32];
+
+    size_t roff = 0, soff = 0;
+    uint8_t rlen = *(signature + 3);
+    os_memcpy(rs, signature + 4, rlen);
+    uint8_t slen = *(signature + 4 + rlen + 1);
+    os_memcpy(ss, signature + 4 + rlen + 2, slen);
+
+    if (rlen > 32 && rs[0] == 0x00) { roff++; }
+    if (slen > 32 && ss[0] == 0x00) { soff++; }
+
+    os_memcpy(r, rs + roff, rlen - roff);
+    os_memcpy(s, ss + soff, slen - soff);
+
+    os_memmove(dst + 0, r, rlen - roff);
+    os_memmove(dst + (rlen - roff), s, slen - soff);
+    os_memmove(dst + (rlen - roff) + (slen - soff), rec, 1);
+
 
     os_memset(signature, 0, signature_cap);
+    os_memset(rs, 0, signature_cap);
+    os_memset(ss, 0, signature_cap);
+    os_memset(r, 0, signature_cap);
+    os_memset(s, 0, signature_cap);
+    os_memset(rec, 0, signature_cap);
 }
 
 size_t pubkeyToMinterAddress(uint8_t *dst, const uint8_t *publicKey) {

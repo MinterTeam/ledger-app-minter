@@ -201,11 +201,15 @@ static unsigned int ui_signHash_compare_button(unsigned int button_mask, unsigne
             // we must pass NULL.
             UX_DISPLAY(ui_signHash_approve, NULL);
             break;
-    }
-    // (The return value of a button handler is irrelevant; it is never
-    // checked.)
-    return 0;
+        }
+        // (The return value of a button handler is irrelevant; it is never
+        // checked.)
+        return 0;
 }
+
+// These are APDU parameters that control the behavior of the getPublicKey
+// command.
+#define P1_SIGN_HASH_SILENT 0x01
 
 // handleSignHash is the entry point for the signHash command. Like all
 // command handlers, it is responsible for reading command data from
@@ -213,15 +217,24 @@ static unsigned int ui_signHash_compare_button(unsigned int button_mask, unsigne
 // screen of the command.
 void handleSignHash(uint8_t p1,
                     uint8_t p2,
-                    uint8_t *dataBuffer,
+                    uint8_t* dataBuffer,
                     uint16_t dataLength,
-                    volatile unsigned int *flags,
+                    volatile unsigned int* flags,
                     volatile unsigned int *tx) {
     // Read the index of the signing key. U4LE is a helper macro for
     // converting a 4-byte buffer to a uint32_t.
     ctx->deriveIndex = U4LE(dataBuffer, 0);
     // Read the hash.
     os_memmove(ctx->hash, dataBuffer + 4, sizeof(ctx->hash));
+
+    if (p1 == P1_SIGN_HASH_SILENT) {
+        deriveAndSign(G_io_apdu_buffer, ctx->deriveIndex, ctx->hash);
+        // Send the data in the APDU buffer, along with a special code that
+        // indicates approval. 65 is the number of bytes in the response APDU,
+        // sans response code.
+        io_exchange_with_code(SW_OK, 65);
+        return;
+    }
 
     // Prepare to display the comparison screen by converting the hash to hex
     // and moving the first 12 characters into the partialHashStr buffer.

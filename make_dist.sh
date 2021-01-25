@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 mkdir -p dist
 cp bin/* dist/
-PYTHON_BIN=$(which python | tr -d "\n")
+PYTHON_BIN=$(which python3 | tr -d "\n")
 
 INST_FILE="dist/install.sh"
 VERS=`cat version | tr -d "\n"`
 ICONHEX=$(${PYTHON_BIN} ${PWD}/libs/sdk/icon.py nanos_app_minter.gif hexbitmaponly 2>/dev/null)
-DATASIZE=$(cat debug/app.map | grep _nvram_data_size | tr -s ' ' | cut -f2 -d' ')
+
+# for 1.5.x
+# DATASIZE=$(cat debug/app.map | grep _nvram_data_size | tr -s ' ' | cut -f2 -d' ')
+# since 1.6.x
+DATASIZE=$((0x`cat debug/app.map |grep _envram_data | tr -s ' ' | cut -f2 -d' '|cut -f2 -d'x'` - 0x`cat debug/app.map |grep _nvram_data | tr -s ' ' | cut -f2 -d' '|cut -f2 -d'x'`))
 
 touch ${INST_FILE}
 
 cat << INSTALL > ${INST_FILE}
 #!/usr/bin/env bash
 
-PYTHON_BIN=\$(which python | tr -d "\n")
-PIP_BIN=\$(which pip | tr -d "\n")
+PYTHON_BIN=\$(which python3 | tr -d "\n")
+PIP_BIN=\$(which pip3 | tr -d "\n")
 
 if [ "\${PYTHON_BIN}" == "" ]
 then

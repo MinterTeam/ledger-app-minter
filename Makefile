@@ -14,8 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #*******************************************************************************
-SCP_PRIVKEY=520ad34420c03953279c40a1e973ec43f81dbef79e469c031ea57315a4cfa7d4
-SCP_PUBKEY=047fbc17bedec5cd055715b41c8d004a73c5b9c8ecf6a2f7b74a92c931b5c274a67a8a215cdb5690a91481f4b4cef3be8cbcb1ea050029f07082b5c9dbe052510d
+#SCP_PRIVKEY=6d0c5eb521e8c205e034c7e5c65fd7785eaa8ac8a60edcffe1eb238acf6541fa
+#SCP_PUBKEY=04c15facb4e2aae57eac019dcc8806152a3104da9f592fd1a1b01623c3937a8c49f428aa64bc17d8d58508410f90e9ef11461de3d61b16a819282544eeb82aa039
 
 BOLOS_SDK := $(PWD)/libs/sdk
 ifeq ($(BOLOS_SDK),)
@@ -51,14 +51,22 @@ APPVERSION = $(shell cat version | tr -d "\n")
 # The --path argument here restricts which BIP32 paths the app is allowed to derive.
 APP_LOAD_PARAMS = --appFlags 0x40 --path "44'/60'" --curve secp256k1 $(COMMON_LOAD_PARAMS)
 APP_SOURCE_PATH = src
-SDK_SOURCE_PATH = lib_stusb lib_stusb_impl
+SDK_SOURCE_PATH = lib_stusb lib_stusb_impl lib_u2f
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+	SDK_SOURCE_PATH  += lib_blewbxx lib_blewbxx_impl
+	SDK_SOURCE_PATH  += lib_ux
+endif
 
 all: default
+
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+	DEFINES += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000 HAVE_BLE_APDU
+endif
 
 # This target will initialize the device with the integration testing mnemonic
 dev_init:
 	@echo "Initializing device with test mnemonic! WARNING TAKES 2 MINUTES AND REQUIRES RECOVERY MODE"
-	@python -m ledgerblue.hostOnboard --apdu --id 0 --prefix "" --passphrase "" --pin 5555 --words "december wedding engage learn plate lion phone lemon hill grocery effort dismiss"
+	@python3 -m ledgerblue.hostOnboard --apdu --id 0 --prefix "" --passphrase "" --pin 5555 --words "december wedding engage learn plate lion phone lemon hill grocery effort dismiss"
 
 # This target will setup a custom developer certificate
 dev_ca:
@@ -77,9 +85,23 @@ delete:
 # Platform #
 ############
 
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+DEFINES += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=300
+DEFINES += HAVE_GLO096
+DEFINES += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
+DEFINES += HAVE_BAGL_ELLIPSIS # long label truncation feature
+DEFINES += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
+DEFINES += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
+DEFINES += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
+DEFINES += HAVE_UX_FLOW
+else
 DEFINES += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=128
+endif
+
 DEFINES += HAVE_BAGL HAVE_SPRINTF
 DEFINES += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=7 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
+## USB U2F04c15facb4e2aae57eac019dcc8806152a3104da9f592fd1a1b01623c3937a8c49f428aa64bc17d8d58508410f90e9ef11461de3d61b16a819282544eeb82aa039
+DEFINES += HAVE_U2F HAVE_IO_U2F U2F_PROXY_MAGIC=\"ADA\" USB_SEGMENT_SIZE=64
 DEFINES += APPVERSION=\"$(APPVERSION)\"
 # DEBUG printf
 DEFINES += HAVE_SPRINTF HAVE_PRINTF PRINTF=screen_printf
@@ -95,12 +117,13 @@ endif
 current_dir = $(shell pwd)
 
 CC := $(CLANGPATH)clang
-CFLAGS += -O0 -Os -Wno-sign-compare -Wno-typedef-redefinition -Wno-int-conversion -I$(current_dir)/libs/secp256k1/include
+CFLAGS += -m32 -O0 -Os -Wno-sign-compare -Wno-typedef-redefinition -Wno-int-conversion -I$(current_dir)/libs/secp256k1/include
 
 AS := $(GCCPATH)arm-none-eabi-gcc
 LD := $(GCCPATH)arm-none-eabi-gcc
 LDFLAGS += -O0 -Os -I$(current_dir)/libs/secp256k1/include
 LDLIBS += -lm -lgcc -lc
+
 
 ##-specs=nosys.specs
 

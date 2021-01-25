@@ -9,3 +9,5 @@ bin
 cmake-build-*
 debug
 debug_keys.txt
+dist/app.apdu
+dist/app.sha256

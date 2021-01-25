@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-PYTHON_BIN=$(which python | tr -d "\n")
-PIP_BIN=$(which pip | tr -d "\n")
+PYTHON_BIN=$(which python3 | tr -d "\n")
+PIP_BIN=$(which pip3 | tr -d "\n")
 
 if [ "${PYTHON_BIN}" == "" ]
 then
@@ -34,6 +34,6 @@ ${PYTHON_BIN} -m ledgerblue.loadApp \
 --fileName app.hex \
 --appName Minter \
 --appVersion 0.1.0 \
---dataSize 0x0000000000000000 \
+--dataSize 0 \
 --icon 0100000000ffffff00ffffffffffffe7ebcfe99fec37e667e7e7e7e7e7e7e7e7e7e7e7ffffffffffff
 
